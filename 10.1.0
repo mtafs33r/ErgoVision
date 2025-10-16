@@ -1,0 +1,7 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting Pillow
+  Downloading pillow-11.3.0-cp313-cp313-win_amd64.whl.metadata (9.2 kB)
+Downloading pillow-11.3.0-cp313-cp313-win_amd64.whl (7.0 MB)
+   ---------------------------------------- 7.0/7.0 MB 249.8 kB/s  0:00:27
+Installing collected packages: Pillow
+Successfully installed Pillow-11.3.0

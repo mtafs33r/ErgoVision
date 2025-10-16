@@ -1,0 +1,49 @@
+{
+    "app_name": "ErgoVision",
+    "version": "1.0.0",
+    "default_settings": {
+        "dark_mode": true,
+        "reminder_interval": 30,
+        "notifications_enabled": true,
+        "voice_assistant_enabled": true,
+        "auto_start_monitoring": false,
+        "camera_resolution": {
+            "width": 640,
+            "height": 480
+        },
+        "posture_thresholds": {
+            "excellent": 80,
+            "average": 60,
+            "poor": 40
+        }
+    },
+    "database": {
+        "path": "ergovision.db",
+        "backup_interval_days": 7
+    },
+    "features": {
+        "voice_assistant": true,
+        "daily_quotes": true,
+        "smart_reminders": true,
+        "data_export": true,
+        "charts_analytics": true,
+        "ai_coaching": true
+    },
+    "ui": {
+        "theme_colors": {
+            "primary": "#3A7FF6",
+            "success": "#38E54D",
+            "warning": "#FFA500",
+            "error": "#FF6B6B",
+            "background": "#212121",
+            "surface": "#2B2B2B",
+            "text": "#FFFFFF"
+        },
+        "window": {
+            "min_width": 1000,
+            "min_height": 700,
+            "default_width": 1200,
+            "default_height": 800
+        }
+    }
+}

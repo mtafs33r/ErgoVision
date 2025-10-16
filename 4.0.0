@@ -1,0 +1,12 @@
+Defaulting to user installation because normal site-packages is not writeable
+Collecting reportlab
+  Downloading reportlab-4.4.4-py3-none-any.whl.metadata (1.7 kB)
+Requirement already satisfied: pillow>=9.0.0 in c:\users\user\appdata\roaming\python\python313\site-packages (from reportlab) (11.3.0)
+Collecting charset-normalizer (from reportlab)
+  Downloading charset_normalizer-3.4.3-cp313-cp313-win_amd64.whl.metadata (37 kB)
+Downloading reportlab-4.4.4-py3-none-any.whl (2.0 MB)
+   ---------------------------------------- 2.0/2.0 MB 139.2 kB/s  0:00:12
+Downloading charset_normalizer-3.4.3-cp313-cp313-win_amd64.whl (107 kB)
+Installing collected packages: charset-normalizer, reportlab
+
+Successfully installed charset-normalizer-3.4.3 reportlab-4.4.4
