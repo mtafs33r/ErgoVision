@@ -6,3 +6,5 @@ Pillow>=10.0.0
 pyttsx3>=2.90
 reportlab>=4.0.0
 pandas>=2.0.0
+pymongo
+python-dotenv

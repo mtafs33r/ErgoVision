@@ -1,16 +1,2 @@
-Defaulting to user installation because normal site-packages is not writeable
-Collecting opencv-python
-  Downloading opencv_python-4.12.0.88-cp37-abi3-win_amd64.whl.metadata (19 kB)
-Collecting numpy<2.3.0,>=2 (from opencv-python)
-  Downloading numpy-2.2.6-cp313-cp313-win_amd64.whl.metadata (60 kB)
-Downloading opencv_python-4.12.0.88-cp37-abi3-win_amd64.whl (39.0 MB)
-   ---------------------------------------- 39.0/39.0 MB 327.6 kB/s  0:03:12
-Downloading numpy-2.2.6-cp313-cp313-win_amd64.whl (12.6 MB)
-   ---------------------------------------- 12.6/12.6 MB 248.4 kB/s  0:00:44
-Installing collected packages: numpy, opencv-python
-  Attempting uninstall: numpy
-    Found existing installation: numpy 2.3.3
-    Uninstalling numpy-2.3.3:
-      Successfully uninstalled numpy-2.3.3
-
-Successfully installed numpy-2.2.6 opencv-python-4.12.0.88
+Requirement already satisfied: opencv-python in C:\Users\Hashim\AppData\Local\Programs\Python\Python313\Lib\site-packages (4.13.0.92)
+Requirement already satisfied: numpy>=2 in C:\Users\Hashim\AppData\Local\Programs\Python\Python313\Lib\site-packages (from opencv-python) (2.4.2)
