@@ -22,7 +22,7 @@ class ErgoVisionApp:
     def __init__(self):
         # Set appearance mode and color theme
         ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("blue")
+        ctk.set_default_color_theme("blue") # We will override specific colors in dashboard.py
         
         # Initialize database
         self.db_manager = DatabaseManager()
