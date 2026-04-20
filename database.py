@@ -97,7 +97,9 @@ class DatabaseManager:
                 "reminder_interval": 30,
                 "notifications_enabled": True,
                 "hydration_reminders": True,
-                "hydration_goal": 2000
+                "hydration_goal": 2000,
+                "mobile_notifications_enabled": True,
+                "posture_alert_threshold_minutes": 2,
             }
             db.user_settings.insert_one(settings_doc)
             
@@ -233,7 +235,9 @@ class DatabaseManager:
             'reminder_interval': 30,
             'notifications_enabled': True,
             'hydration_reminders': True,
-            'hydration_goal': 2000
+            'hydration_goal': 2000,
+            'mobile_notifications_enabled': True,
+            'posture_alert_threshold_minutes': 2,
         }
         
         try:
@@ -246,7 +250,9 @@ class DatabaseManager:
                     'reminder_interval': result.get('reminder_interval', 30),
                     'notifications_enabled': result.get('notifications_enabled', True),
                     'hydration_reminders': result.get('hydration_reminders', True),
-                    'hydration_goal': result.get('hydration_goal', 2000)
+                    'hydration_goal': result.get('hydration_goal', 2000),
+                    'mobile_notifications_enabled': result.get('mobile_notifications_enabled', True),
+                    'posture_alert_threshold_minutes': result.get('posture_alert_threshold_minutes', 2),
                 }
             else:
                 return default_settings
@@ -264,7 +270,9 @@ class DatabaseManager:
                 "reminder_interval": settings.get('reminder_interval', 30),
                 "notifications_enabled": settings.get('notifications_enabled', True),
                 "hydration_reminders": settings.get('hydration_reminders', True),
-                "hydration_goal": settings.get('hydration_goal', 2000)
+                "hydration_goal": settings.get('hydration_goal', 2000),
+                "mobile_notifications_enabled": settings.get('mobile_notifications_enabled', True),
+                "posture_alert_threshold_minutes": settings.get('posture_alert_threshold_minutes', 2),
             }
             
             db.user_settings.update_one(

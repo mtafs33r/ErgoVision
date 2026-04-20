@@ -714,12 +714,18 @@ class DashboardWindow:
     
     def start_monitoring(self):
         """Start posture monitoring"""
+        # Read current notification settings
+        mobile_notif_enabled = self.settings.get('mobile_notifications_enabled', True)
+        alert_threshold = self.settings.get('posture_alert_threshold_minutes', 2)
+
         self.posture_monitor = PostureMonitor(
             self.camera_frame,
             self.user_data['id'],
             self.db_manager,
             self.on_posture_update,
-            self.on_session_end
+            self.on_session_end,
+            mobile_notifications_enabled=mobile_notif_enabled,
+            alert_threshold_minutes=float(alert_threshold),
         )
         
         if self.posture_monitor.start():
@@ -727,6 +733,7 @@ class DashboardWindow:
             self.status_label.configure(text="Monitoring Active")
         else:
             messagebox.showerror("Error", "Failed to start camera. Please check your camera connection.")
+
     
     def stop_monitoring(self):
         """Stop posture monitoring"""

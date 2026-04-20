@@ -11,16 +11,44 @@ from datetime import datetime, timedelta
 import customtkinter as ctk
 from PIL import Image, ImageTk
 import tkinter as tk
+from notification_sender import NotificationSender
 
 class PostureMonitor:
-    def __init__(self, camera_frame, user_id, db_manager, posture_callback, session_callback):
-        """Initialize posture monitor"""
+    def __init__(
+        self,
+        camera_frame,
+        user_id,
+        db_manager,
+        posture_callback,
+        session_callback,
+        mobile_notifications_enabled: bool = True,
+        alert_threshold_minutes: float = 2.0,
+        server_url: str = None,
+    ):
+        """Initialize posture monitor
+
+        Parameters
+        ----------
+        mobile_notifications_enabled : bool
+            Whether to send push alerts to the mobile app.
+        alert_threshold_minutes : float
+            Number of consecutive minutes of "Poor" posture before an alert fires.
+        server_url : str, optional
+            Override the relay server URL (e.g. if running on a different host).
+        """
         self.camera_frame = camera_frame
         self.user_id = user_id
         self.db_manager = db_manager
         self.posture_callback = posture_callback
         self.session_callback = session_callback
-        
+
+        # Mobile notification settings
+        self.mobile_notifications_enabled = mobile_notifications_enabled
+        self.alert_threshold_seconds = alert_threshold_minutes * 60
+        self._notification_sender = NotificationSender(user_id, server_url)
+
+        # Bad-posture sustain tracker
+        self._poor_posture_start: datetime | None = None  # when "Poor" streak began
         # Monitoring state
         self.is_monitoring = False
         self.cap = None
@@ -160,6 +188,9 @@ class PostureMonitor:
                 self.update_camera_display(frame)
                 if self.posture_callback:
                     self.posture_callback(posture_status, posture_score)
+
+                # ---- Bad-posture sustain tracking & mobile alert ----
+                self._check_and_send_posture_alert(posture_status)
         except Exception as e:
             print(f"Error in monitoring loop: {e}")
         # Aim for ~30 FPS
@@ -168,7 +199,41 @@ class PostureMonitor:
         except Exception:
             # If scheduling fails, stop monitoring gracefully
             self.is_monitoring = False
-    
+
+    def _check_and_send_posture_alert(self, posture_status: str) -> None:
+        """Track consecutive poor-posture duration; fire mobile alert when threshold exceeded."""
+        if not self.mobile_notifications_enabled:
+            self._poor_posture_start = None
+            return
+
+        if posture_status == "Poor":
+            if self._poor_posture_start is None:
+                # Start of a new bad-posture streak
+                self._poor_posture_start = datetime.now()
+            else:
+                streak_seconds = (
+                    datetime.now() - self._poor_posture_start
+                ).total_seconds()
+
+                if streak_seconds >= self.alert_threshold_seconds:
+                    # Cooldown = same as threshold so we don't spam
+                    if self._notification_sender.can_send(
+                        int(self.alert_threshold_seconds)
+                    ):
+                        minutes = int(self.alert_threshold_seconds // 60)
+                        self._notification_sender.send_posture_alert(
+                            message=(
+                                f"Your posture has been poor for {minutes} minute"
+                                f"{'s' if minutes != 1 else ''}. "
+                                "Sit up straight and take a break! 🪑"
+                            ),
+                            severity="warning",
+                        )
+                        # Reset streak so the timer restarts after the alert
+                        self._poor_posture_start = datetime.now()
+        else:
+            # Posture is Good or Average — reset the streak
+            self._poor_posture_start = None
     def analyze_posture(self, frame):
         """Analyze posture in the given frame"""
         # Convert to grayscale for processing

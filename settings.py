@@ -65,6 +65,9 @@ class SettingsWindow:
         # Notifications section
         self.create_notifications_section(main_frame)
         
+        # Mobile Notifications section
+        self.create_mobile_notifications_section(main_frame)
+        
         # Profile section
         self.create_profile_section(main_frame)
         
@@ -191,6 +194,61 @@ class SettingsWindow:
             variable=self.interval_var
         )
         self.interval_dropdown.pack(side="right")
+    
+    def create_mobile_notifications_section(self, parent):
+        """Create mobile push notifications settings section"""
+        section_frame = ctk.CTkFrame(parent)
+        section_frame.pack(fill="x", pady=(0, 20))
+
+        # Section title
+        ctk.CTkLabel(
+            section_frame,
+            text="📱 Mobile Push Notifications",
+            font=ctk.CTkFont(size=20, weight="bold")
+        ).pack(pady=(20, 5))
+
+        ctk.CTkLabel(
+            section_frame,
+            text="Sends an alert to your phone when poor posture persists",
+            font=ctk.CTkFont(size=12),
+            text_color="gray"
+        ).pack(pady=(0, 15))
+
+        # Enable toggle
+        mobile_notif_frame = ctk.CTkFrame(section_frame, fg_color="transparent")
+        mobile_notif_frame.pack(fill="x", padx=20, pady=5)
+
+        self.mobile_notifications_var = tk.BooleanVar()
+        self.mobile_notifications_checkbox = ctk.CTkCheckBox(
+            mobile_notif_frame,
+            text="Enable Mobile Push Alerts",
+            variable=self.mobile_notifications_var
+        )
+        self.mobile_notifications_checkbox.pack(side="left")
+
+        ctk.CTkLabel(
+            mobile_notif_frame,
+            text="Notify my phone via Expo",
+            font=ctk.CTkFont(size=12)
+        ).pack(side="right")
+
+        # Threshold dropdown
+        threshold_frame = ctk.CTkFrame(section_frame, fg_color="transparent")
+        threshold_frame.pack(fill="x", padx=20, pady=(5, 20))
+
+        ctk.CTkLabel(
+            threshold_frame,
+            text="Alert After Bad Posture for:",
+            font=ctk.CTkFont(size=14)
+        ).pack(side="left")
+
+        self.posture_threshold_var = tk.StringVar()
+        self.posture_threshold_dropdown = ctk.CTkOptionMenu(
+            threshold_frame,
+            values=["1 minute", "2 minutes", "3 minutes", "5 minutes"],
+            variable=self.posture_threshold_var
+        )
+        self.posture_threshold_dropdown.pack(side="right")
     
     def create_profile_section(self, parent):
         """Create profile settings section"""
@@ -341,15 +399,36 @@ For support or feedback, please contact us."""
             90: "90 minutes"
         }
         self.interval_var.set(interval_options.get(interval_minutes, "30 minutes"))
+
+        # Mobile push notifications
+        self.mobile_notifications_var.set(
+            self.current_settings.get('mobile_notifications_enabled', True)
+        )
+        threshold_minutes = self.current_settings.get('posture_alert_threshold_minutes', 2)
+        threshold_options = {
+            1: "1 minute",
+            2: "2 minutes",
+            3: "3 minutes",
+            5: "5 minutes",
+        }
+        self.posture_threshold_var.set(
+            threshold_options.get(threshold_minutes, "2 minutes")
+        )
     
     def save_settings(self):
         """Save settings to database"""
         try:
+            # Parse threshold string back to int
+            threshold_str = self.posture_threshold_var.get()  # e.g. "2 minutes"
+            threshold_minutes = int(threshold_str.split()[0])
+
             # Collect settings
             new_settings = {
                 'dark_mode': self.dark_mode_var.get(),
                 'notifications_enabled': self.notifications_var.get(),
-                'reminder_interval': int(self.interval_var.get().split()[0])
+                'reminder_interval': int(self.interval_var.get().split()[0]),
+                'mobile_notifications_enabled': self.mobile_notifications_var.get(),
+                'posture_alert_threshold_minutes': threshold_minutes,
             }
             
             # Save to database
