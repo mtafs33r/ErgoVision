@@ -119,6 +119,20 @@ class AuthWindow:
         )
         self.login_btn.pack(pady=(0, 15))
         
+        # Demo Mode / Bypass button
+        self.demo_btn = ctk.CTkButton(
+            login_frame,
+            text="🚀 Demo Mode (Bypass)",
+            width=250,
+            height=40,
+            fg_color="#38E54D",
+            hover_color="#2EB43B",
+            text_color="#000000",
+            font=ctk.CTkFont(weight="bold"),
+            command=self.handle_demo_login
+        )
+        self.demo_btn.pack(pady=(0, 15))
+        
         # Forgot password link
         self.forgot_link = ctk.CTkLabel(
             login_frame,
@@ -311,6 +325,18 @@ class AuthWindow:
             self.auth_callback(user_data)
         else:
             messagebox.showerror("Error", "Invalid username or password")
+            
+    def handle_demo_login(self):
+        """Handle demo/bypass login"""
+        self.db_manager.bypass_mode = True
+        demo_user = {
+            'id': 999, 
+            'username': 'DemoUser', 
+            'email': 'demo@ergovision.ai',
+            'remember_me': False
+        }
+        messagebox.showinfo("Demo Mode", "Entering Demo Mode. Database features will be simulated.")
+        self.auth_callback(demo_user)
     
     def handle_signup(self):
         """Handle signup attempt"""

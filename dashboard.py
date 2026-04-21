@@ -147,7 +147,7 @@ class DashboardWindow:
         """Setup the main UI layout"""
         # Configure grid weights
         self.window.grid_columnconfigure(1, weight=1)
-        self.window.grid_rowconfigure(0, weight=1)
+        self.window.grid_rowconfigure(1, weight=1)
         
         # Sidebar
         self.create_sidebar()
@@ -577,9 +577,9 @@ class DashboardWindow:
 
         # Guide Cards
         guides = [
-            ("Ideal Setup", "ideal_posture.png", "Optimize your workspace alignment."),
-            ("Comparison", "posture_comparison.png", "Understand Good vs Poor habits."),
-            ("Stretches", "posture_stretches.png", "Quick exercises for desk relief.")
+            ("Ideal Setup", "ideal_posture.png", "• Keep screen at eye level\n• Feet flat on floor\n• Elbows at 90 degrees\n• Shoulders relaxed"),
+            ("Comparison", "posture_comparison.png", "• Avoid 'Tech Neck'\n• Pull chin back\n• Keep ears over shoulders\n• Stack spine vertically"),
+            ("Stretches", "posture_stretches.png", "• Tilt head side-to-side\n• Roll shoulders back\n• Stretch wrists daily\n• Stand up every 30m")
         ]
 
         assets_path = os.path.join(os.path.dirname(__file__), "assets", "posture_guide")
@@ -608,7 +608,7 @@ class DashboardWindow:
                 card, text=desc, text_color=self.colors["text_secondary"],
                 font=ctk.CTkFont(family=self.font_family, size=12),
                 wraplength=220, justify="left"
-            ).pack(padx=15, pady=(2, 15), anchor="w")
+            ).pack(padx=15, pady=(5, 20), anchor="w")
         
         # Load initial tip only if profile is available
         try:

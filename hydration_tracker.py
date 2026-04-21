@@ -22,194 +22,211 @@ class HydrationTracker:
         self.parent_frame = parent_frame
         self.current_goal = 2000  # Default goal in ml
         
+        # Premium Colors (Synced with Dashboard)
+        self.colors = {
+            "bg_dark": "#0B0E14",
+            "bg_panel": "#14181F",
+            "bg_card": "#1E2430",
+            "neon_blue": "#3A7FF6",
+            "neon_cyan": "#00F2FF",
+            "neon_green": "#38E54D",
+            "accent": "#FF6B6B",
+            "text_primary": "#FFFFFF",
+            "text_secondary": "#A0AEC0",
+            "border": "#2D3748"
+        }
+        self.padding = 20
+        self.corner_radius = 16
+        self.font_family = "Inter"
+
         self.setup_ui()
         self.load_hydration_data()
     
     def setup_ui(self):
-        """Setup the hydration tracker UI"""
-        # Main container
-        self.main_frame = ctk.CTkFrame(self.parent_frame)
-        self.main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        """Setup the hydration tracker UI with premium styling"""
+        # Main container with scroll
+        self.scroll_frame = ctk.CTkScrollableFrame(self.parent_frame, fg_color="transparent")
+        self.scroll_frame.pack(fill="both", expand=True)
         
-        # Title
-        title_label = ctk.CTkLabel(
-            self.main_frame,
-            text="💧 Hydration Tracker",
-            font=ctk.CTkFont(size=24, weight="bold")
-        )
-        title_label.pack(pady=(0, 20))
+        self.main_container = ctk.CTkFrame(self.scroll_frame, fg_color="transparent")
+        self.main_container.pack(fill="both", expand=True, padx=30, pady=30)
+
+        # Title Section
+        header_frame = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 30))
         
-        # Top section - Today's progress
+        ctk.CTkLabel(
+            header_frame,
+            text="💧 Hydration Intelligence",
+            text_color=self.colors["neon_cyan"],
+            font=ctk.CTkFont(family=self.font_family, size=28, weight="bold")
+        ).pack(side="left")
+
+        # Top section - Today's Analytics Card
         self.create_progress_section()
         
-        # Middle section - Quick log
-        self.create_log_section()
+        # Middle section - Interaction Cards
+        mid_row = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        mid_row.pack(fill="x", pady=(0, 30))
+        mid_row.columnconfigure(0, weight=1)
+        mid_row.columnconfigure(1, weight=1)
+
+        self.create_log_section(mid_row)
+        self.create_tips_section(mid_row)
         
-        # Bottom section - Charts and history
+        # Bottom section - Visual Analytics Card
         self.create_charts_section()
     
     def create_progress_section(self):
-        """Create today's hydration progress section"""
-        progress_frame = ctk.CTkFrame(self.main_frame)
-        progress_frame.pack(fill="x", pady=(0, 20))
+        """Create today's high-impact progress card"""
+        card = ctk.CTkFrame(self.main_container, fg_color=self.colors["bg_panel"], corner_radius=self.corner_radius)
+        card.pack(fill="x", pady=(0, 30))
         
-        # Progress title
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="x", padx=30, pady=30)
+
+        # Left side: Progress Info
+        info_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        info_frame.grid(row=0, column=0, sticky="nsew")
+        
         ctk.CTkLabel(
-            progress_frame,
-            text="Today's Hydration Goal",
-            font=ctk.CTkFont(size=18, weight="bold")
-        ).pack(pady=(15, 10))
-        
-        # Progress bar
-        self.progress_bar = ctk.CTkProgressBar(
-            progress_frame,
-            width=400,
-            height=20
-        )
-        self.progress_bar.pack(pady=(0, 10))
-        self.progress_bar.set(0)
-        
-        # Progress info
+            info_frame, text="DAILY PROGRESS", text_color=self.colors["text_secondary"],
+            font=ctk.CTkFont(family=self.font_family, size=12, weight="bold")
+        ).pack(anchor="w")
+
         self.progress_info = ctk.CTkLabel(
-            progress_frame,
-            text="0 ml / 2000 ml (0%)",
-            font=ctk.CTkFont(size=14)
+            info_frame, text="0 ml / 2000 ml (0%)", text_color=self.colors["text_primary"],
+            font=ctk.CTkFont(family=self.font_family, size=28, weight="bold")
         )
-        self.progress_info.pack(pady=(0, 15))
+        self.progress_info.pack(anchor="w", pady=(5, 15))
         
-        # Goal setting
-        goal_frame = ctk.CTkFrame(progress_frame)
-        goal_frame.pack(fill="x", padx=20, pady=(0, 15))
+        self.progress_bar = ctk.CTkProgressBar(
+            info_frame, width=500, height=12, corner_radius=6,
+            fg_color=self.colors["bg_card"], progress_color=self.colors["neon_blue"]
+        )
+        self.progress_bar.pack(anchor="w")
+        self.progress_bar.set(0)
+
+        # Right side: Goal Settings
+        goal_frame = ctk.CTkFrame(inner, fg_color=self.colors["bg_card"], corner_radius=12)
+        goal_frame.grid(row=0, column=1, padx=(40, 0), sticky="nsew")
         
         ctk.CTkLabel(
-            goal_frame,
-            text="Daily Goal (ml):",
-            font=ctk.CTkFont(size=14, weight="bold")
-        ).pack(side="left", padx=(10, 5))
-        
+            goal_frame, text="SET TARGET (ML)", text_color=self.colors["text_secondary"],
+            font=ctk.CTkFont(family=self.font_family, size=10, weight="bold")
+        ).pack(pady=(15, 5), padx=20)
+
+        entry_frame = ctk.CTkFrame(goal_frame, fg_color="transparent")
+        entry_frame.pack(padx=20, pady=(0, 15))
+
         self.goal_entry = ctk.CTkEntry(
-            goal_frame,
-            width=100,
-            placeholder_text="2000"
+            entry_frame, width=100, height=35, placeholder_text="2000",
+            fg_color=self.colors["bg_panel"], border_color=self.colors["border"], corner_radius=8
         )
         self.goal_entry.pack(side="left", padx=(0, 10))
         
-        update_goal_btn = ctk.CTkButton(
-            goal_frame,
-            text="Update Goal",
-            width=100,
+        ctk.CTkButton(
+            entry_frame, text="Update", width=80, height=35, corner_radius=8,
+            fg_color=self.colors["neon_blue"], hover_color="#2A6CD6",
+            font=ctk.CTkFont(family=self.font_family, size=13, weight="bold"),
             command=self.update_goal
-        )
-        update_goal_btn.pack(side="left", padx=(0, 10))
+        ).pack(side="left")
     
-    def create_log_section(self):
-        """Create hydration logging section"""
-        log_frame = ctk.CTkFrame(self.main_frame)
-        log_frame.pack(fill="x", pady=(0, 20))
+    def create_log_section(self, parent):
+        """Create premium hydration logging card"""
+        card = ctk.CTkFrame(parent, fg_color=self.colors["bg_panel"], corner_radius=self.corner_radius)
+        card.grid(row=0, column=0, padx=(0, 15), sticky="nsew")
         
-        # Log title
         ctk.CTkLabel(
-            log_frame,
-            text="Log Hydration",
-            font=ctk.CTkFont(size=18, weight="bold")
-        ).pack(pady=(15, 10))
-        
+            card, text="💧 QUICK LOG", text_color=self.colors["neon_cyan"],
+            font=ctk.CTkFont(family=self.font_family, size=16, weight="bold")
+        ).pack(pady=(20, 15), padx=25, anchor="w")
+
         # Quick log buttons
-        quick_frame = ctk.CTkFrame(log_frame)
+        quick_frame = ctk.CTkFrame(card, fg_color="transparent")
         quick_frame.pack(fill="x", padx=20, pady=(0, 10))
         
         quick_amounts = [250, 500, 750, 1000]
-        for amount in quick_amounts:
+        # Grid for buttons to look cleaner
+        for i, amount in enumerate(quick_amounts):
             btn = ctk.CTkButton(
-                quick_frame,
-                text=f"+{amount}ml",
-                width=80,
+                quick_frame, text=f"+{amount}ml", width=85, height=35, corner_radius=8,
+                fg_color=self.colors["bg_card"], hover_color=self.colors["border"],
+                font=ctk.CTkFont(family=self.font_family, size=12, weight="bold"),
                 command=lambda a=amount: self.log_hydration(a)
             )
-            btn.pack(side="left", padx=5)
-        
+            btn.grid(row=i//2, column=i%2, padx=5, pady=5, sticky="ew")
+        quick_frame.columnconfigure((0, 1), weight=1)
+
         # Custom log
-        custom_frame = ctk.CTkFrame(log_frame)
-        custom_frame.pack(fill="x", padx=20, pady=(10, 15))
-        
         ctk.CTkLabel(
-            custom_frame,
-            text="Custom amount:",
-            font=ctk.CTkFont(size=14)
-        ).pack(side="left", padx=(10, 5))
-        
+            card, text="CUSTOM LOG", text_color=self.colors["text_secondary"],
+            font=ctk.CTkFont(family=self.font_family, size=10, weight="bold")
+        ).pack(pady=(15, 5), padx=25, anchor="w")
+
+        custom_frame = ctk.CTkFrame(card, fg_color="transparent")
+        custom_frame.pack(fill="x", padx=20, pady=(0, 20))
+
         self.custom_amount_entry = ctk.CTkEntry(
-            custom_frame,
-            width=100,
-            placeholder_text="ml"
+            custom_frame, width=100, height=35, placeholder_text="ml",
+            fg_color=self.colors["bg_card"], border_color=self.colors["border"], corner_radius=8
         )
-        self.custom_amount_entry.pack(side="left", padx=(0, 10))
-        
-        ctk.CTkLabel(
-            custom_frame,
-            text="Drink type:",
-            font=ctk.CTkFont(size=14)
-        ).pack(side="left", padx=(10, 5))
-        
+        self.custom_amount_entry.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+
         self.drink_type_var = tk.StringVar(value="water")
         drink_type_menu = ctk.CTkOptionMenu(
-            custom_frame,
-            values=["water", "tea", "coffee", "juice", "sports drink", "other"],
-            variable=self.drink_type_var,
-            width=120
+            custom_frame, values=["water", "tea", "coffee", "juice", "other"],
+            variable=self.drink_type_var, width=120, height=35, corner_radius=8,
+            fg_color=self.colors["bg_card"], button_color=self.colors["neon_blue"]
         )
-        drink_type_menu.pack(side="left", padx=(0, 10))
-        
-        log_btn = ctk.CTkButton(
-            custom_frame,
-            text="Log Drink",
-            width=100,
+        drink_type_menu.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+
+        ctk.CTkButton(
+            card, text="LOG TRANSACTION", fg_color=self.colors["neon_green"],
+            text_color="#000000", hover_color="#2EB43B", corner_radius=10, height=40,
+            font=ctk.CTkFont(family=self.font_family, size=14, weight="bold"),
             command=self.log_custom_hydration
+        ).pack(fill="x", padx=25, pady=(5, 25))
+
+    def create_tips_section(self, parent):
+        """Create premium hydration tips card"""
+        card = ctk.CTkFrame(parent, fg_color=self.colors["bg_panel"], corner_radius=self.corner_radius)
+        card.grid(row=0, column=1, padx=(15, 0), sticky="nsew")
+
+        ctk.CTkLabel(
+            card, text="💡 SMART TIPS", text_color=self.colors["neon_cyan"],
+            font=ctk.CTkFont(family=self.font_family, size=16, weight="bold")
+        ).pack(pady=(20, 15), padx=25, anchor="w")
+
+        tips_text = (
+            "• Start your day with a glass of water\n"
+            "• Keep a bottle visible on your desk\n"
+            "• Set hourly reminders to drink\n"
+            "• Eat water-rich foods\n"
+            "• Listen to your thirst signals"
         )
-        log_btn.pack(side="left", padx=(0, 10))
+        
+        ctk.CTkLabel(
+            card, text=tips_text, text_color=self.colors["text_secondary"],
+            font=ctk.CTkFont(family=self.font_family, size=14), justify="left"
+        ).pack(padx=25, pady=(0, 20), anchor="w")
     
     def create_charts_section(self):
-        """Create charts and history section"""
-        charts_frame = ctk.CTkFrame(self.main_frame)
-        charts_frame.pack(fill="both", expand=True)
+        """Create premium charts and history section"""
+        card = ctk.CTkFrame(self.main_container, fg_color=self.colors["bg_panel"], corner_radius=self.corner_radius)
+        card.pack(fill="both", expand=True)
         
-        # Charts title
         ctk.CTkLabel(
-            charts_frame,
-            text="Weekly Hydration History",
-            font=ctk.CTkFont(size=18, weight="bold")
-        ).pack(pady=(15, 10))
+            card, text="📊 WEEKLY ANALYTICS", text_color=self.colors["text_primary"],
+            font=ctk.CTkFont(family=self.font_family, size=16, weight="bold")
+        ).pack(pady=(20, 10), padx=30, anchor="w")
         
-        # Create matplotlib figure
-        self.fig, self.ax = plt.subplots(figsize=(8, 4), facecolor='#212121')
-        self.ax.set_facecolor('#2b2b2b')
-        self.canvas = FigureCanvasTkAgg(self.fig, charts_frame)
+        # Create matplotlib figure with premium theme
+        self.fig, self.ax = plt.subplots(figsize=(8, 4), facecolor=self.colors["bg_panel"])
+        self.ax.set_facecolor(self.colors["bg_card"])
+        self.canvas = FigureCanvasTkAgg(self.fig, card)
 
-        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=20, pady=(0, 15))
-        
-        # Tips section
-        tips_frame = ctk.CTkFrame(charts_frame)
-        tips_frame.pack(fill="x", padx=20, pady=(0, 15))
-        
-        ctk.CTkLabel(
-            tips_frame,
-            text="💡 Hydration Tips",
-            font=ctk.CTkFont(size=16, weight="bold")
-        ).pack(pady=(10, 5))
-        
-        tips_text = """• Start your day with a glass of water
-• Keep a water bottle visible on your desk
-• Set hourly reminders to drink water
-• Eat water-rich foods like fruits and vegetables
-• Listen to your body's thirst signals"""
-        
-        tips_label = ctk.CTkLabel(
-            tips_frame,
-            text=tips_text,
-            font=ctk.CTkFont(size=12),
-            justify="left"
-        )
-        tips_label.pack(pady=(0, 10))
+        self.canvas.get_tk_widget().pack(fill="both", expand=True, padx=30, pady=(0, 30))
     
     def load_hydration_data(self):
         """Load and display current hydration data"""
@@ -339,32 +356,34 @@ class HydrationTracker:
                     dates.append(date.strftime('%a'))
                     amounts.append(day_data['total_ml'])
                 
-                # Create bar chart
-                bars = self.ax.bar(dates, amounts, color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2'])
+                # Create bar chart with neon styling
+                bars = self.ax.bar(dates, amounts, color=self.colors["neon_blue"], alpha=0.8, edgecolor=self.colors["neon_cyan"], linewidth=1)
                 
                 # Customize chart
-                self.ax.set_ylabel('Water (ml)', color='white')
-                self.ax.set_title('Weekly Hydration', color='white', fontsize=14, fontweight='bold')
-                self.ax.tick_params(colors='white')
+                self.ax.set_ylabel('Water (ml)', color=self.colors["text_secondary"], fontname=self.font_family)
+                self.ax.set_title('WEEKLY HYDRATION', color=self.colors["text_primary"], fontsize=14, fontweight='bold', fontname=self.font_family)
+                self.ax.tick_params(colors=self.colors["text_secondary"])
                 
                 # Add goal line
-                self.ax.axhline(y=self.current_goal, color='red', linestyle='--', alpha=0.7, label=f'Daily Goal ({self.current_goal}ml)')
-                self.ax.legend()
+                self.ax.axhline(y=self.current_goal, color=self.colors["accent"], linestyle='--', alpha=0.7, label=f'Goal ({self.current_goal}ml)')
+                leg = self.ax.legend(facecolor=self.colors["bg_card"], edgecolor=self.colors["border"])
+                for text in leg.get_texts():
+                    text.set_color(self.colors["text_primary"])
                 
                 # Add value labels on bars
                 for bar, amount in zip(bars, amounts):
                     height = bar.get_height()
                     self.ax.text(bar.get_x() + bar.get_width()/2., height + 50,
-                               f'{amount}ml', ha='center', va='bottom', color='white', fontsize=10)
+                               f'{amount}ml', ha='center', va='bottom', color=self.colors["text_primary"], fontsize=10, fontname=self.font_family)
                 
             else:
                 self.ax.text(0.5, 0.5, 'No hydration data available', 
                            ha='center', va='center', transform=self.ax.transAxes, 
-                           color='white', fontsize=14)
+                           color=self.colors["text_secondary"], fontsize=14, fontname=self.font_family)
             
             # Style the chart
-            self.ax.spines['bottom'].set_color('white')
-            self.ax.spines['left'].set_color('white')
+            self.ax.spines['bottom'].set_color(self.colors["border"])
+            self.ax.spines['left'].set_color(self.colors["border"])
             self.ax.spines['top'].set_visible(False)
             self.ax.spines['right'].set_visible(False)
             

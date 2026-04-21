@@ -22,15 +22,34 @@ class DatabaseManager:
         self.db_name = db_name
         self.client = None
         self.db = None
+        self.bypass_mode = False # Add bypass mode flag
         self.init_database()
     
     def get_connection(self):
         """Get MongoDB database instance"""
+        if self.bypass_mode:
+            return None
+            
         if self.db is None:
             # Connect using the connection string from environment variables, or default to localhost
             uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-            self.client = MongoClient(uri)
-            self.db = self.client[self.db_name]
+            try:
+                self.client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+                self.db = self.client[self.db_name]
+                # Force a connection check
+                self.client.admin.command('ping')
+            except Exception as e:
+                error_msg = str(e)
+                if "dnspython" in error_msg:
+                    print("\n[ERROR] Missing 'dnspython' package. This is required for 'mongodb+srv://' connection strings.")
+                    print("Please run: pip install dnspython\n")
+                elif "DNS query name does not exist" in error_msg:
+                    print(f"\n[ERROR] DNS Resolution Failed: {e}")
+                    print("This usually happens when your internal DNS doesn't support SRV records.")
+                    print("Try changing your DNS to Google (8.8.8.8) or Cloudflare (1.1.1.1).\n")
+                else:
+                    print(f"\n[ERROR] Could not connect to MongoDB: {e}\n")
+                raise e
         return self.db
     
     def init_database(self):
@@ -162,8 +181,19 @@ class DatabaseManager:
     
     def get_user_profile(self, user_id: int) -> Optional[Dict]:
         """Get user profile information"""
+        if self.bypass_mode:
+            return {
+                'name': 'Demo User',
+                'age': 30,
+                'height': 180,
+                'weight': 75,
+                'gender': 'Male',
+                'desktop_setup': 'Standing Desk'
+            }
+            
         try:
             db = self.get_connection()
+            if not db: return None
             
             result = db.user_profiles.find_one({"user_id": user_id})
             
@@ -240,8 +270,12 @@ class DatabaseManager:
             'posture_alert_threshold_minutes': 2,
         }
         
+        if self.bypass_mode:
+            return default_settings
+            
         try:
             db = self.get_connection()
+            if not db: return default_settings
             result = db.user_settings.find_one({"user_id": user_id})
             
             if result:

@@ -1,2 +1,7 @@
-Requirement already satisfied: opencv-python in C:\Users\Hashim\AppData\Local\Programs\Python\Python313\Lib\site-packages (4.13.0.92)
-Requirement already satisfied: numpy>=2 in C:\Users\Hashim\AppData\Local\Programs\Python\Python313\Lib\site-packages (from opencv-python) (2.4.2)
+Collecting opencv-python
+  Downloading opencv_python-4.13.0.92-cp37-abi3-win_amd64.whl.metadata (20 kB)
+Requirement already satisfied: numpy>=2 in C:\Users\786\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages (from opencv-python) (2.4.0)
+Downloading opencv_python-4.13.0.92-cp37-abi3-win_amd64.whl (40.2 MB)
+   ---------------------------------------- 40.2/40.2 MB 4.4 MB/s  0:00:09
+Installing collected packages: opencv-python
+Successfully installed opencv-python-4.13.0.92
