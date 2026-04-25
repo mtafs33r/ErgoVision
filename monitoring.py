@@ -12,6 +12,8 @@ import customtkinter as ctk
 from PIL import Image, ImageTk
 import tkinter as tk
 from notification_sender import NotificationSender
+import mediapipe as mp
+import math
 
 class PostureMonitor:
     def __init__(
@@ -63,6 +65,15 @@ class PostureMonitor:
         # Posture detection parameters
         self.good_posture_threshold = 0.8
         self.average_posture_threshold = 0.6
+        
+        # Setup MediaPipe Pose
+        self.mp_pose = mp.solutions.pose
+        self.pose = self.mp_pose.Pose(
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
+        )
+        self.mp_drawing = mp.solutions.drawing_utils
+        self.last_results = None
         
         # Setup camera preview
         self.setup_camera_preview()
@@ -235,54 +246,54 @@ class PostureMonitor:
             # Posture is Good or Average — reset the streak
             self._poor_posture_start = None
     def analyze_posture(self, frame):
-        """Analyze posture in the given frame"""
-        # Convert to grayscale for processing
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        """Analyze posture in the given frame using MediaPipe"""
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        rgb_frame.flags.writeable = False
+        results = self.pose.process(rgb_frame)
+        self.last_results = results
+        rgb_frame.flags.writeable = True
+
+        posture_score = 100.0
+
+        if not results.pose_landmarks:
+            return 0, "Poor"
         
-        # This is a simplified posture detection algorithm
-        # In a real implementation, you would use pose estimation libraries like MediaPipe
+        landmarks = results.pose_landmarks.landmark
         
-        # For demonstration, we'll simulate posture detection based on image characteristics
-        # This is a placeholder implementation
-        
-        # Calculate image variance (rough measure of movement/stability)
-        variance = cv2.Laplacian(gray, cv2.CV_64F).var()
-        
-        # Calculate brightness (can indicate head position relative to light)
-        brightness = np.mean(gray)
-        
-        # Calculate edge density (can indicate posture alignment)
-        edges = cv2.Canny(gray, 50, 150)
-        edge_density = np.sum(edges) / (frame.shape[0] * frame.shape[1])
-        
-        # Simulate posture score based on these factors
-        # This is a simplified algorithm - real implementation would be much more sophisticated
-        
-        # Normalize factors (these values are arbitrary for demonstration)
-        variance_score = min(variance / 1000, 1.0)  # Higher variance = more movement = worse posture
-        brightness_score = 1.0 - abs(brightness - 127) / 127  # Optimal brightness around middle
-        edge_score = min(edge_density * 100, 1.0)  # Moderate edge density is good
-        
-        # Combine scores (weights are arbitrary)
-        posture_score = (variance_score * 0.3 + brightness_score * 0.4 + edge_score * 0.3) * 100
-        
-        # Add some randomness to make it more realistic
-        posture_score += np.random.normal(0, 5)
-        posture_score = max(0, min(100, posture_score))  # Clamp to 0-100
-        
-        # Determine posture status
+        left_shoulder = landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value]
+        right_shoulder = landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value]
+        nose = landmarks[self.mp_pose.PoseLandmark.NOSE.value]
+
+        # 1. Shoulder Level (y-axis alignment)
+        shoulder_y_diff = abs(left_shoulder.y - right_shoulder.y)
+        if shoulder_y_diff > 0.03:
+            posture_score -= (shoulder_y_diff - 0.03) * 500
+
+        # 2. Neck alignment (nose x vs mid-shoulder x)
+        mid_shoulder_x = (left_shoulder.x + right_shoulder.x) / 2.0
+        neck_x_diff = abs(nose.x - mid_shoulder_x)
+        if neck_x_diff > 0.05:
+            posture_score -= (neck_x_diff - 0.05) * 400
+            
+        # 3. Forward head tracking (Z depth)
+        mid_shoulder_z = (left_shoulder.z + right_shoulder.z) / 2.0
+        head_depth = nose.z - mid_shoulder_z
+        if head_depth < -0.15:
+            posture_score -= (abs(head_depth) - 0.15) * 200
+
+        posture_score = max(0, min(100, posture_score))
+
         if posture_score >= 80:
             posture_status = "Good"
         elif posture_score >= 60:
             posture_status = "Average"
         else:
             posture_status = "Poor"
-        
+
         return posture_score, posture_status
     
     def draw_posture_analysis(self, frame, score, status):
         """Draw posture analysis overlay on frame"""
-        # Define colors for different posture states
         colors = {
             "Good": (0, 255, 0),      # Green
             "Average": (0, 165, 255),  # Orange
@@ -291,37 +302,25 @@ class PostureMonitor:
         
         color = colors.get(status, (255, 255, 255))
         
-        # Draw posture status
+        # Draw MediaPipe landmarks if available
+        if hasattr(self, 'last_results') and self.last_results and self.last_results.pose_landmarks:
+            self.mp_drawing.draw_landmarks(
+                frame,
+                self.last_results.pose_landmarks,
+                self.mp_pose.POSE_CONNECTIONS,
+                landmark_drawing_spec=self.mp_drawing.DrawingSpec(color=(255,255,255), thickness=2, circle_radius=2),
+                connection_drawing_spec=self.mp_drawing.DrawingSpec(color=color, thickness=2)
+            )
+
         cv2.putText(frame, f"Posture: {status}", (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
         
-        # Draw score
         cv2.putText(frame, f"Score: {int(score)}", (10, 70), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
         
-        # Draw posture indicator circle
-        center = (frame.shape[1] - 50, 50)
-        radius = 20
-        
-        # Circle color based on posture
-        cv2.circle(frame, center, radius, color, -1)
-        
-        # Add status text next to circle
-        cv2.putText(frame, status, (center[0] + 35, center[1] + 5), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-        
-        # Draw posture guidelines (simplified)
         height, width = frame.shape[:2]
-        
-        # Draw center line
-        cv2.line(frame, (width//2, 0), (width//2, height), (128, 128, 128), 1)
-        
-        # Draw horizontal guideline at 1/3 height (suggested eye level)
-        guideline_y = height // 3
-        cv2.line(frame, (0, guideline_y), (width, guideline_y), (128, 128, 128), 1)
-        
-        # Draw posture feedback text
         feedback_y = height - 30
+        
         if status == "Good":
             feedback_text = "Keep it up! Great posture!"
         elif status == "Average":
