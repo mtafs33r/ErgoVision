@@ -858,14 +858,36 @@ class DashboardWindow:
                 self.tip_text.insert("1.0", "Please complete your profile in the Dashboard tab to get personalized AI tips!")
                 return
             
-            tip = self.ai_coach.generate_tip(profile, sessions)
-            
+            # Show loading state
+            self.new_tip_btn.configure(state="disabled", text="Generating...")
             self.tip_text.delete("1.0", "end")
-            self.tip_text.insert("1.0", tip)
+            self.tip_text.insert("1.0", "🧠 Analyzing your data to generate a personalized tip...")
+            
+            # Run in separate thread
+            threading.Thread(target=self._fetch_tip_thread, args=(profile, sessions), daemon=True).start()
+            
         except Exception as e:
-            print(f"Error generating tip: {e}")
+            print(f"Error starting tip generation: {e}")
             self.tip_text.delete("1.0", "end")
             self.tip_text.insert("1.0", "Unable to generate tip at this time. Please try again later.")
+            
+    def _fetch_tip_thread(self, profile, sessions):
+        """Fetch tip in background thread"""
+        try:
+            tip = self.ai_coach.generate_tip(profile, sessions)
+            self.window.after(0, self._update_tip_ui, tip)
+        except Exception as e:
+            print(f"Error generating tip: {e}")
+            self.window.after(0, self._update_tip_ui, "Unable to generate tip at this time. Please try again later.")
+            
+    def _update_tip_ui(self, tip):
+        """Update UI with new tip from main thread"""
+        try:
+            self.tip_text.delete("1.0", "end")
+            self.tip_text.insert("1.0", tip)
+            self.new_tip_btn.configure(state="normal", text="Generate New Tip")
+        except Exception:
+            pass
     
     def load_stats(self):
         """Load and display quick stats"""

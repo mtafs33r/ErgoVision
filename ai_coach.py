@@ -4,13 +4,30 @@ Provides personalized health and posture tips
 """
 
 import random
+import os
 from typing import Dict, List, Optional
 from database import DatabaseManager
+
+try:
+    import google.generativeai as genai
+    HAS_GEMINI = True
+except ImportError:
+    HAS_GEMINI = False
 
 class AICoach:
     def __init__(self, db_manager: DatabaseManager):
         """Initialize AI coach"""
         self.db_manager = db_manager
+        
+        # Initialize Gemini API if available
+        self.gemini_model = None
+        api_key = os.getenv("GEMINI_API_KEY")
+        if HAS_GEMINI and api_key:
+            try:
+                genai.configure(api_key=api_key)
+                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+            except Exception as e:
+                print(f"Failed to initialize Gemini AI: {e}")
         
         # Health tips database
         self.posture_tips = [
@@ -78,8 +95,41 @@ class AICoach:
             "You have the power to transform your workspace into a health-promoting environment."
         ]
     
+    def _build_gemini_prompt(self, profile: Dict, sessions: List[Dict]) -> str:
+        """Build prompt for Gemini AI based on user context"""
+        name = profile.get('name', 'User')
+        
+        context = f"You are ErgoVision's AI Posture and Health Coach. Keep your response concise (3-4 sentences max), friendly, motivating, and personalized.\n\n"
+        context += f"User Profile:\n- Name: {name}\n"
+        
+        if profile.get('height') and profile.get('weight'):
+            bmi, category = self.db_manager.calculate_bmi(profile['height'], profile['weight'])
+            context += f"- Health Check: BMI is {bmi:.1f} ({category})\n"
+            
+        if profile.get('desktop_setup'):
+            context += f"- Setup: {profile['desktop_setup']}\n"
+            
+        if sessions:
+            recent_scores = [s['score'] for s in sessions[:5] if s.get('score')]
+            if recent_scores:
+                avg_score = sum(recent_scores) / len(recent_scores)
+                context += f"- Recent Posture Score Average: {avg_score:.1f}/100\n"
+                
+        context += "\nBased on this profile, provide ONE highly specific piece of actionable ergonomic, postural, or exercise advice. Use emojis, stay professional yet encouraging. Address them by their name!"
+        return context
+
     def generate_tip(self, profile: Optional[Dict], sessions: List[Dict]) -> str:
         """Generate a personalized health tip based on user data"""
+        # Try to use Gemini AI first
+        if self.gemini_model and profile:
+            try:
+                prompt = self._build_gemini_prompt(profile, sessions)
+                response = self.gemini_model.generate_content(prompt)
+                if response and response.text:
+                    return f"🤖 GEMINI AI COACH:\n\n{response.text.strip()}"
+            except Exception as e:
+                print(f"Gemini generation failed, falling back to local tips: {e}")
+                
         tip_categories = []
         
         # Analyze user profile
