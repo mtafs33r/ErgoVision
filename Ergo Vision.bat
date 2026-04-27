@@ -35,7 +35,7 @@ if %errorlevel% neq 0 (
 
 echo.
 echo [2/3] Checking dependencies...
-python -c "import customtkinter" >nul 2>&1
+python -c "import customtkinter; import mediapipe" >nul 2>&1
 if %errorlevel% neq 0 (
     echo ❌ Dependencies not installed!
     echo.
@@ -61,6 +61,11 @@ if exist "dist\ErgoVision.exe" (
 ) else (
     echo 🚀 Launching ErgoVision from source...
     python main.py
+    if %errorlevel% neq 0 (
+        echo.
+        echo ❌ ErgoVision exited with an error!
+        pause
+    )
 )
 
 echo.

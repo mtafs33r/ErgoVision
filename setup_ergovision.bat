@@ -38,6 +38,10 @@ if %errorlevel% equ 0 (
         python -m pip install pyttsx3>=2.90
         python -m pip install reportlab>=4.0.0
         python -m pip install pandas>=2.1.0
+        python -m pip install mediapipe>=0.10.0
+        python -m pip install pymongo
+        python -m pip install python-dotenv
+        python -m pip install google-generativeai
     )
 ) else (
     echo Using standard requirements...

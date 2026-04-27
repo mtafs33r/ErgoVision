@@ -13,6 +13,10 @@ from PIL import Image, ImageTk
 import tkinter as tk
 from notification_sender import NotificationSender
 import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
+import os
+import urllib.request
 import math
 
 class PostureMonitor:
@@ -66,13 +70,22 @@ class PostureMonitor:
         self.good_posture_threshold = 0.8
         self.average_posture_threshold = 0.6
         
-        # Setup MediaPipe Pose
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        self.mp_drawing = mp.solutions.drawing_utils
+        # Ensure model exists
+        self.model_path = "pose_landmarker_lite.task"
+        if not os.path.exists(self.model_path):
+            print("Downloading Pose Landmarker model...")
+            urllib.request.urlretrieve(
+                'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',
+                self.model_path
+            )
+        
+        # Setup MediaPipe Pose Tasks API
+        base_options = python.BaseOptions(model_asset_path=self.model_path)
+        options = vision.PoseLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.VIDEO,
+            output_segmentation_masks=False)
+        self.detector = vision.PoseLandmarker.create_from_options(options)
         self.last_results = None
         
         # Setup camera preview
@@ -248,44 +261,56 @@ class PostureMonitor:
     def analyze_posture(self, frame):
         """Analyze posture in the given frame using MediaPipe"""
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        rgb_frame.flags.writeable = False
-        results = self.pose.process(rgb_frame)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+        
+        # In VIDEO mode, we need to pass a monotonically increasing timestamp in ms
+        timestamp_ms = int(time.time() * 1000)
+        results = self.detector.detect_for_video(mp_image, timestamp_ms)
         self.last_results = results
-        rgb_frame.flags.writeable = True
 
         posture_score = 100.0
 
         if not results.pose_landmarks:
-            return 0, "Poor"
+            return 0, "No Detection"
         
-        landmarks = results.pose_landmarks.landmark
+        # Take the first detected person
+        landmarks = results.pose_landmarks[0]
         
-        left_shoulder = landmarks[self.mp_pose.PoseLandmark.LEFT_SHOULDER.value]
-        right_shoulder = landmarks[self.mp_pose.PoseLandmark.RIGHT_SHOULDER.value]
-        nose = landmarks[self.mp_pose.PoseLandmark.NOSE.value]
+        # MediaPipe landmark indices: 11 = LEFT_SHOULDER, 12 = RIGHT_SHOULDER, 0 = NOSE
+        left_shoulder = landmarks[11]
+        right_shoulder = landmarks[12]
+        nose = landmarks[0]
 
-        # 1. Shoulder Level (y-axis alignment)
-        shoulder_y_diff = abs(left_shoulder.y - right_shoulder.y)
-        if shoulder_y_diff > 0.03:
-            posture_score -= (shoulder_y_diff - 0.03) * 500
+        # Normalize penalties against shoulder width to make scoring completely immune to camera distance
+        shoulder_width = abs(left_shoulder.x - right_shoulder.x)
+        shoulder_width = max(0.05, shoulder_width)  # Prevent division by zero if sideways
 
-        # 2. Neck alignment (nose x vs mid-shoulder x)
+        # 1. Shoulder Level (y-axis tilt normalized)
+        # Any deviation continuously drains points (no dead zones where score is perfect 100 if slightly tilted)
+        shoulder_y_diff_ratio = abs(left_shoulder.y - right_shoulder.y) / shoulder_width
+        posture_score -= (shoulder_y_diff_ratio * 100)
+
+        # 2. Neck alignment (nose x vs mid-shoulder x to detect leaning sideways)
         mid_shoulder_x = (left_shoulder.x + right_shoulder.x) / 2.0
-        neck_x_diff = abs(nose.x - mid_shoulder_x)
-        if neck_x_diff > 0.05:
-            posture_score -= (neck_x_diff - 0.05) * 400
+        neck_x_ratio = abs(nose.x - mid_shoulder_x) / shoulder_width
+        posture_score -= (neck_x_ratio * 100)
             
-        # 3. Forward head tracking (Z depth)
-        mid_shoulder_z = (left_shoulder.z + right_shoulder.z) / 2.0
-        head_depth = nose.z - mid_shoulder_z
-        if head_depth < -0.15:
-            posture_score -= (abs(head_depth) - 0.15) * 200
+        # 3. Forward slouch (Face drop on Y axis vs shoulder width)
+        mid_shoulder_y = (left_shoulder.y + right_shoulder.y) / 2.0
+        neck_height = mid_shoulder_y - nose.y
+        neck_height_ratio = neck_height / shoulder_width
+        
+        # Perfect upright posture has an average neck height ratio > 0.70.
+        # Continuously and smoothly penalty as the head drops closer to shoulder level.
+        slouch_amount = max(0.0, 0.70 - neck_height_ratio)
+        posture_score -= (slouch_amount * 150)
 
-        posture_score = max(0, min(100, posture_score))
+        posture_score = max(0, min(100, int(posture_score)))
 
-        if posture_score >= 80:
+        # Symmetrical thresholds over the 0-100 range
+        if posture_score >= 67:
             posture_status = "Good"
-        elif posture_score >= 60:
+        elif posture_score >= 34:
             posture_status = "Average"
         else:
             posture_status = "Poor"
@@ -297,20 +322,35 @@ class PostureMonitor:
         colors = {
             "Good": (0, 255, 0),      # Green
             "Average": (0, 165, 255),  # Orange
-            "Poor": (0, 0, 255)       # Red
+            "Poor": (0, 0, 255),      # Red
+            "No Detection": (128, 128, 128) # Gray
         }
         
         color = colors.get(status, (255, 255, 255))
         
-        # Draw MediaPipe landmarks if available
+        # Draw key landmarks if available
         if hasattr(self, 'last_results') and self.last_results and self.last_results.pose_landmarks:
-            self.mp_drawing.draw_landmarks(
-                frame,
-                self.last_results.pose_landmarks,
-                self.mp_pose.POSE_CONNECTIONS,
-                landmark_drawing_spec=self.mp_drawing.DrawingSpec(color=(255,255,255), thickness=2, circle_radius=2),
-                connection_drawing_spec=self.mp_drawing.DrawingSpec(color=color, thickness=2)
-            )
+            landmarks = self.last_results.pose_landmarks[0]
+            height, width = frame.shape[:2]
+            
+            # Draw circles on Nose, Left Shoulder, Right Shoulder
+            for idx in [0, 11, 12]:
+                if idx < len(landmarks):
+                    lm = landmarks[idx]
+                    # Ensure validity of x and y
+                    if hasattr(lm, 'x') and hasattr(lm, 'y'):
+                        cx, cy = int(lm.x * width), int(lm.y * height)
+                        cv2.circle(frame, (cx, cy), 6, color, -1)
+                        cv2.circle(frame, (cx, cy), 8, (255, 255, 255), 2)
+            
+            # Draw line between shoulders if both found
+            if len(landmarks) > 12:
+                ls = landmarks[11]
+                rs = landmarks[12]
+                if hasattr(ls, 'x') and hasattr(rs, 'x'):
+                    cx1, cy1 = int(ls.x * width), int(ls.y * height)
+                    cx2, cy2 = int(rs.x * width), int(rs.y * height)
+                    cv2.line(frame, (cx1, cy1), (cx2, cy2), color, 3)
 
         cv2.putText(frame, f"Posture: {status}", (10, 30), 
                    cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
@@ -325,8 +365,10 @@ class PostureMonitor:
             feedback_text = "Keep it up! Great posture!"
         elif status == "Average":
             feedback_text = "Slight adjustment needed"
-        else:
+        elif status == "Poor":
             feedback_text = "Please adjust your posture"
+        else:
+            feedback_text = "Searching for posture..."
         
         cv2.putText(frame, feedback_text, (10, feedback_y), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
