@@ -28,7 +28,7 @@ class PostureMonitor:
         posture_callback,
         session_callback,
         mobile_notifications_enabled: bool = True,
-        alert_threshold_minutes: float = 2.0,
+        alert_threshold_minutes: float = 0.0833,  # 5 seconds default
         server_url: str = None,
     ):
         """Initialize posture monitor
@@ -233,30 +233,41 @@ class PostureMonitor:
         if posture_status == "Poor":
             if self._poor_posture_start is None:
                 # Start of a new bad-posture streak
+                print("[Monitor] Poor posture detected! Starting 5-second timer...")
                 self._poor_posture_start = datetime.now()
             else:
                 streak_seconds = (
                     datetime.now() - self._poor_posture_start
                 ).total_seconds()
+                
+                # Log progress every second to debug
+                if int(streak_seconds) > 0 and int(streak_seconds) > getattr(self, '_last_log_second', 0):
+                    print(f"[Monitor] Slouching for {int(streak_seconds)}s...")
+                    self._last_log_second = int(streak_seconds)
 
                 if streak_seconds >= self.alert_threshold_seconds:
+                    self._last_log_second = 0 # reset log counter
+                    print(f"[Monitor] Poor posture threshold reached ({int(streak_seconds)}s). Triggering alert...")
                     # Cooldown = same as threshold so we don't spam
-                    if self._notification_sender.can_send(
-                        int(self.alert_threshold_seconds)
-                    ):
-                        minutes = int(self.alert_threshold_seconds // 60)
-                        self._notification_sender.send_posture_alert(
-                            message=(
-                                f"Your posture has been poor for {minutes} minute"
-                                f"{'s' if minutes != 1 else ''}. "
-                                "Sit up straight and take a break! 🪑"
-                            ),
-                            severity="warning",
-                        )
+                    can = self._notification_sender.can_send(int(self.alert_threshold_seconds))
+                    print(f"[Monitor] can_send check = {can} (last sent: {self._notification_sender._last_sent_at})")
+                    if can:
+                        threshold_s = int(self.alert_threshold_seconds)
+                        if threshold_s < 60:
+                            time_str = f"{threshold_s} seconds"
+                        else:
+                            minutes = threshold_s // 60
+                            time_str = f"{minutes} minute{'s' if minutes != 1 else ''}"
+                        msg = f"You've had poor posture for {time_str}. Sit up straight! 🪑"
+                        print(f"[Monitor] Calling send_posture_alert with user_id={self.user_id}")
+                        self._notification_sender.send_posture_alert(message=msg, severity="warning")
                         # Reset streak so the timer restarts after the alert
                         self._poor_posture_start = datetime.now()
         else:
             # Posture is Good or Average — reset the streak
+            if self._poor_posture_start is not None:
+                print("[Monitor] Posture improved. Timer reset.")
+                self._last_log_second = 0
             self._poor_posture_start = None
     def analyze_posture(self, frame):
         """Analyze posture in the given frame using MediaPipe"""

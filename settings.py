@@ -245,7 +245,7 @@ class SettingsWindow:
         self.posture_threshold_var = tk.StringVar()
         self.posture_threshold_dropdown = ctk.CTkOptionMenu(
             threshold_frame,
-            values=["1 minute", "2 minutes", "3 minutes", "5 minutes"],
+            values=["5 seconds", "1 minute", "2 minutes", "3 minutes", "5 minutes"],
             variable=self.posture_threshold_var
         )
         self.posture_threshold_dropdown.pack(side="right")
@@ -406,21 +406,25 @@ For support or feedback, please contact us."""
         )
         threshold_minutes = self.current_settings.get('posture_alert_threshold_minutes', 2)
         threshold_options = {
+            0.0833: "5 seconds",
             1: "1 minute",
             2: "2 minutes",
             3: "3 minutes",
             5: "5 minutes",
         }
         self.posture_threshold_var.set(
-            threshold_options.get(threshold_minutes, "2 minutes")
+            threshold_options.get(threshold_minutes, "5 seconds")
         )
     
     def save_settings(self):
         """Save settings to database"""
         try:
             # Parse threshold string back to int
-            threshold_str = self.posture_threshold_var.get()  # e.g. "2 minutes"
-            threshold_minutes = int(threshold_str.split()[0])
+            threshold_str = self.posture_threshold_var.get()  # e.g. "5 seconds" or "2 minutes"
+            if "second" in threshold_str:
+                threshold_minutes = 5 / 60
+            else:
+                threshold_minutes = int(threshold_str.split()[0])
 
             # Collect settings
             new_settings = {

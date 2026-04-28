@@ -92,6 +92,7 @@ class NotificationSender:
             }
         ).encode("utf-8")
 
+        print(f"[ErgoVision] Sending push notification request for user {self.user_id} to {url}...")
         req = urllib.request.Request(
             url,
             data=payload,

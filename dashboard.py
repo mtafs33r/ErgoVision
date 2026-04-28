@@ -777,7 +777,7 @@ class DashboardWindow:
         """Start posture monitoring"""
         # Read current notification settings
         mobile_notif_enabled = self.settings.get('mobile_notifications_enabled', True)
-        alert_threshold = self.settings.get('posture_alert_threshold_minutes', 2)
+        alert_threshold = self.settings.get('posture_alert_threshold_minutes', 0.0833) # Default to 5 seconds
 
         self.posture_monitor = PostureMonitor(
             self.camera_frame,

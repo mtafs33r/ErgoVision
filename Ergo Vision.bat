@@ -30,7 +30,7 @@ if %errorlevel% neq 0 (
     pause
     exit /b 1
 ) else (
-    echo ✅ Python found!
+    echo ✅ Python found!a
 )
 
 echo.
