@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 from database import DatabaseManager
 
 try:
-    import google.generativeai as genai
+    from google import genai as google_genai
     HAS_GEMINI = True
 except ImportError:
     HAS_GEMINI = False
@@ -20,12 +20,11 @@ class AICoach:
         self.db_manager = db_manager
         
         # Initialize Gemini API if available
-        self.gemini_model = None
+        self.gemini_client = None
         api_key = os.getenv("GEMINI_API_KEY")
         if HAS_GEMINI and api_key:
             try:
-                genai.configure(api_key=api_key)
-                self.gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+                self.gemini_client = google_genai.Client(api_key=api_key)
             except Exception as e:
                 print(f"Failed to initialize Gemini AI: {e}")
         
@@ -121,10 +120,13 @@ class AICoach:
     def generate_tip(self, profile: Optional[Dict], sessions: List[Dict]) -> str:
         """Generate a personalized health tip based on user data"""
         # Try to use Gemini AI first
-        if self.gemini_model and profile:
+        if self.gemini_client and profile:
             try:
                 prompt = self._build_gemini_prompt(profile, sessions)
-                response = self.gemini_model.generate_content(prompt)
+                response = self.gemini_client.models.generate_content(
+                    model='gemini-2.0-flash',
+                    contents=prompt
+                )
                 if response and response.text:
                     return f"🤖 GEMINI AI COACH:\n\n{response.text.strip()}"
             except Exception as e:

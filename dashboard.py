@@ -7,6 +7,7 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox
 import threading
+import queue
 from datetime import datetime, timedelta
 import json
 import os
@@ -90,6 +91,7 @@ class DashboardWindow:
             self.ai_coach = AICoach(db_manager)
             self.reports_window = None
             self.settings_window = None
+            self._tip_queue = queue.Queue()  # thread-safe result channel for AI tips
             
             # Setup UI
             self.setup_ui()
@@ -264,16 +266,17 @@ class DashboardWindow:
         self.content_frame = ctk.CTkFrame(self.window, fg_color=self.colors["bg_dark"], corner_radius=0)
         self.content_frame.grid(row=1, column=1, sticky="nsew", padx=0, pady=0)
         
-        # Create different views
+        # Create different views - ALL views must be created before switch_view
+        # because switch_view calls load_stats which references labels from reports view
         self.views = {}
         self.create_home_view()
         self.create_monitoring_view()
         self.create_ai_coach_view()
         self.create_hydration_view()
-        self.create_reports_view()
+        self.create_reports_view()   # must be before switch_view
         self.create_settings_view()
         
-        # Show home view by default
+        # Show home view by default - safe now since all views/labels are created
         self.switch_view("home")
     
     def create_home_view(self):
@@ -287,21 +290,21 @@ class DashboardWindow:
 
         # 1. Posture Score Card
         score_card = self.create_metric_card(
-            metrics_frame, "Posture Score", "85%", "target", self.colors["neon_cyan"]
+            metrics_frame, "Posture Score", "--", "target", self.colors["neon_cyan"]
         )
         score_card.grid(row=0, column=0, padx=(0, 10), sticky="nsew")
         self.metric_posture_score = score_card.metric_label # reference for updates
 
         # 2. Hours Tracked Card
         hours_card = self.create_metric_card(
-            metrics_frame, "Hours Today", "6.2h", "clock", self.colors["neon_blue"]
+            metrics_frame, "Hours Today", "--", "clock", self.colors["neon_blue"]
         )
         hours_card.grid(row=0, column=1, padx=10, sticky="nsew")
         self.metric_hours_tracked = hours_card.metric_label
 
         # 3. Breaks Taken Card
         breaks_card = self.create_metric_card(
-            metrics_frame, "Breaks Taken", "4", "coffee", self.colors["neon_green"]
+            metrics_frame, "Breaks Taken", "--", "coffee", self.colors["neon_green"]
         )
         breaks_card.grid(row=0, column=2, padx=(10, 0), sticky="nsew")
         self.metric_breaks_taken = breaks_card.metric_label
@@ -490,46 +493,7 @@ class DashboardWindow:
         )
         self.score_label.pack(pady=(2, 20))
         
-        # Status frame
-        status_frame = ctk.CTkFrame(monitoring_frame)
-        status_frame.pack(pady=(0, 20), padx=30, fill="x")
-        
-        ctk.CTkLabel(
-            status_frame,
-            text="Current Status",
-            font=ctk.CTkFont(size=18, weight="bold")
-        ).pack(pady=(15, 10))
-        
-        self.status_label = ctk.CTkLabel(
-            status_frame,
-            text="Not Monitoring",
-            font=ctk.CTkFont(size=16)
-        )
-        self.status_label.pack(pady=(0, 15))
-        
-        # Session info
-        session_frame = ctk.CTkFrame(monitoring_frame)
-        session_frame.pack(pady=(0, 20), padx=30, fill="x")
-        
-        ctk.CTkLabel(
-            session_frame,
-            text="Session Information",
-            font=ctk.CTkFont(size=18, weight="bold")
-        ).pack(pady=(15, 10))
-        
-        self.duration_label = ctk.CTkLabel(
-            session_frame,
-            text="Duration: 0:00",
-            font=ctk.CTkFont(size=14)
-        )
-        self.duration_label.pack(pady=2)
-        
-        self.score_label = ctk.CTkLabel(
-            session_frame,
-            text="Current Score: N/A",
-            font=ctk.CTkFont(size=14)
-        )
-        self.score_label.pack(pady=(2, 15))
+        # Note: Redundant status_frame and session_frame removed to avoid attribute name collisions.
         
         self.views["monitoring"] = monitoring_frame
     
@@ -610,17 +574,14 @@ class DashboardWindow:
                 wraplength=220, justify="left"
             ).pack(padx=15, pady=(5, 20), anchor="w")
         
-        # Load initial tip only if profile is available
-        try:
-            profile = self.db_manager.get_user_profile(self.user_data['id'])
-            if profile and profile.get('height') and profile.get('weight'):
-                self.get_new_tip()
-            else:
-                self.tip_text.delete("1.0", "end")
-                self.tip_text.insert("1.0", "Please complete your profile in the Dashboard tab to get personalized AI tips!")
-        except:
-            self.tip_text.delete("1.0", "end")
-            self.tip_text.insert("1.0", "Please complete your profile in the Dashboard tab to get personalized AI tips!")
+        # Show a static welcome — do NOT call get_new_tip() here.
+        # This view is built during __init__, before the Tk mainloop starts.
+        # If we start a background thread now, its window.after(0, ...) callback
+        # will be queued but the button state will never reset, leaving the UI
+        # permanently stuck on "Generating...".
+        # The user can click "Generate New Tip" once the app is fully running.
+        self.tip_text.delete("1.0", "end")
+        self.tip_text.insert("1.0", "👋 Welcome to your AI Health Coach!\n\nClick 'Generate New Tip' to get a personalized ergonomic or posture recommendation powered by Gemini AI.")
         
         self.views["ai_coach"] = coach_frame
     
@@ -657,6 +618,25 @@ class DashboardWindow:
         # Quick metrics placeholder
         self.stats_display_frame = ctk.CTkFrame(stats_container, fg_color="transparent")
         self.stats_display_frame.pack(pady=(0, 25), padx=25, fill="x")
+        
+        # Stats Labels
+        self.recent_sessions_label = ctk.CTkLabel(
+            self.stats_display_frame, text="Recent Sessions: --", 
+            text_color=self.colors["text_primary"], font=ctk.CTkFont(family=self.font_family, size=16)
+        )
+        self.recent_sessions_label.pack(pady=5)
+        
+        self.avg_score_label = ctk.CTkLabel(
+            self.stats_display_frame, text="Average Score: --", 
+            text_color=self.colors["text_primary"], font=ctk.CTkFont(family=self.font_family, size=16)
+        )
+        self.avg_score_label.pack(pady=5)
+        
+        self.best_score_label = ctk.CTkLabel(
+            self.stats_display_frame, text="Best Score: --", 
+            text_color=self.colors["text_primary"], font=ctk.CTkFont(family=self.font_family, size=16)
+        )
+        self.best_score_label.pack(pady=5)
         
         self.views["reports"] = reports_frame
     
@@ -716,6 +696,13 @@ class DashboardWindow:
             self.load_stats()
         elif view_name == "reports":
             self.load_stats()
+        elif view_name == "ai_coach":
+            # Auto-generate the first tip when the user opens the AI Coach tab.
+            # We do it here (inside the running mainloop) rather than during __init__,
+            # so the background thread's window.after() callback executes correctly.
+            if not getattr(self, '_ai_coach_initialized', False):
+                self._ai_coach_initialized = True
+                self.get_new_tip()
     
     def update_datetime(self):
         """Update date and time display"""
@@ -757,11 +744,17 @@ class DashboardWindow:
     
     def save_profile(self):
         """Save user profile information"""
+        # Extract and clean profile data
+        name = self.name_entry.get().strip()
+        age_str = self.age_entry.get().strip()
+        height_str = self.height_entry.get().strip()
+        weight_str = self.weight_entry.get().strip()
+        
         profile_data = {
-            'name': self.name_entry.get().strip(),
-            'age': int(self.age_entry.get()) if self.age_entry.get().isdigit() else None,
-            'height': float(self.height_entry.get()) if self.height_entry.get().replace('.', '').isdigit() else None,
-            'weight': float(self.weight_entry.get()) if self.weight_entry.get().replace('.', '').isdigit() else None,
+            'name': name,
+            'age': int(age_str) if age_str.isdigit() else None,
+            'height': float(height_str) if height_str.replace('.', '', 1).isdigit() else None,
+            'weight': float(weight_str) if weight_str.replace('.', '', 1).isdigit() else None,
             'gender': self.gender_var.get(),
             'desktop_setup': self.setup_var.get()
         }
@@ -852,66 +845,114 @@ class DashboardWindow:
             profile = self.db_manager.get_user_profile(self.user_data['id'])
             sessions = self.db_manager.get_posture_sessions(self.user_data['id'], limit=10)
             
-            # Ensure profile has required data
             if not profile or not profile.get('height') or not profile.get('weight'):
-                self.tip_text.delete("1.0", "end")
-                self.tip_text.insert("1.0", "Please complete your profile in the Dashboard tab to get personalized AI tips!")
-                return
+                print("Profile incomplete, providing general tips.")
             
             # Show loading state
             self.new_tip_btn.configure(state="disabled", text="Generating...")
             self.tip_text.delete("1.0", "end")
-            self.tip_text.insert("1.0", "🧠 Analyzing your data to generate a personalized tip...")
+            self.tip_text.insert("1.0", "🧠 Analyzing your data...")
             
-            # Run in separate thread
-            threading.Thread(target=self._fetch_tip_thread, args=(profile, sessions), daemon=True).start()
+            # Clear any previous result from queue
+            while not self._tip_queue.empty():
+                self._tip_queue.get_nowait()
+            
+            # Start background thread — it only writes to the queue, no tkinter calls
+            threading.Thread(
+                target=self._fetch_tip_thread,
+                args=(profile, sessions),
+                daemon=True
+            ).start()
+            
+            # Start polling the queue from the main thread (100ms interval)
+            self.window.after(100, self._poll_tip_queue)
             
         except Exception as e:
             print(f"Error starting tip generation: {e}")
             self.tip_text.delete("1.0", "end")
             self.tip_text.insert("1.0", "Unable to generate tip at this time. Please try again later.")
-            
+            self.new_tip_btn.configure(state="normal", text="Generate New Tip")
+
     def _fetch_tip_thread(self, profile, sessions):
-        """Fetch tip in background thread"""
+        """Fetch tip in background thread.
+        IMPORTANT: must NOT make any tkinter calls — only writes to self._tip_queue.
+        """
         try:
             tip = self.ai_coach.generate_tip(profile, sessions)
-            self.window.after(0, self._update_tip_ui, tip)
         except Exception as e:
             print(f"Error generating tip: {e}")
-            self.window.after(0, self._update_tip_ui, "Unable to generate tip at this time. Please try again later.")
-            
-    def _update_tip_ui(self, tip):
-        """Update UI with new tip from main thread"""
+            tip = "Unable to generate tip at this time. Please try again later."
+        self._tip_queue.put(tip)  # thread-safe, no tkinter involved
+
+    def _poll_tip_queue(self):
+        """Called on the main thread every 100ms to check if the tip is ready."""
         try:
+            tip = self._tip_queue.get_nowait()
+            # Got a result — update the UI now (we're on the main thread)
             self.tip_text.delete("1.0", "end")
             self.tip_text.insert("1.0", tip)
             self.new_tip_btn.configure(state="normal", text="Generate New Tip")
+        except queue.Empty:
+            # Not ready yet — check again in 100ms
+            self.window.after(100, self._poll_tip_queue)
         except Exception:
+            # Window was destroyed or some other error — stop polling
             pass
     
     def load_stats(self):
-        """Load and display quick stats"""
-        sessions = self.db_manager.get_posture_sessions(self.user_data['id'], limit=50)
-        
-        if sessions:
-            # Recent sessions count
-            recent_count = len([s for s in sessions if 
-                              datetime.fromisoformat(s['date'].replace('Z', '+00:00')).date() == datetime.now().date()])
-            self.recent_sessions_label.configure(text=f"Recent Sessions: {recent_count}")
+        """Load and display quick stats with error handling for UI elements"""
+        try:
+            sessions = self.db_manager.get_posture_sessions(self.user_data['id'], limit=50)
             
-            # Average score
-            scores = [s['score'] for s in sessions if s['score'] is not None]
-            if scores:
-                avg_score = sum(scores) / len(scores)
-                self.avg_score_label.configure(text=f"Average Score: {avg_score:.1f}")
+            if sessions:
+                # Recent sessions count
+                today_sessions = [s for s in sessions if 
+                                  datetime.fromisoformat(s['date'].replace('Z', '+00:00')).date() == datetime.now().date()]
+                recent_count = len(today_sessions)
                 
-                # Best score
-                best_score = max(scores)
-                self.best_score_label.configure(text=f"Best Score: {best_score}")
-        else:
-            self.recent_sessions_label.configure(text="Recent Sessions: 0")
-            self.avg_score_label.configure(text="Average Score: N/A")
-            self.best_score_label.configure(text="Best Score: N/A")
+                if hasattr(self, 'recent_sessions_label'):
+                    self.recent_sessions_label.configure(text=f"Recent Sessions: {recent_count}")
+                
+                # Update Hours and Breaks on Home view
+                if hasattr(self, 'metric_breaks_taken'):
+                    self.metric_breaks_taken.configure(text=str(recent_count))
+                
+                total_minutes = sum(s['duration'] for s in today_sessions)
+                hours_today = total_minutes / 60
+                if hasattr(self, 'metric_hours_tracked'):
+                    self.metric_hours_tracked.configure(text=f"{hours_today:.1f}h")
+
+                # Average score
+                scores = [s['score'] for s in sessions if s['score'] is not None]
+                if scores:
+                    avg_score = sum(scores) / len(scores)
+                    
+                    if hasattr(self, 'avg_score_label'):
+                        self.avg_score_label.configure(text=f"Average Score: {avg_score:.1f}")
+                    
+                    if hasattr(self, 'metric_posture_score'):
+                        self.metric_posture_score.configure(text=f"{int(avg_score)}%")
+                    
+                    # Best score
+                    best_score = max(scores)
+                    if hasattr(self, 'best_score_label'):
+                        self.best_score_label.configure(text=f"Best Score: {best_score}")
+            else:
+                # Set default values for no data
+                if hasattr(self, 'recent_sessions_label'):
+                    self.recent_sessions_label.configure(text="Recent Sessions: 0")
+                if hasattr(self, 'avg_score_label'):
+                    self.avg_score_label.configure(text="Average Score: N/A")
+                if hasattr(self, 'best_score_label'):
+                    self.best_score_label.configure(text="Best Score: N/A")
+                if hasattr(self, 'metric_posture_score'):
+                    self.metric_posture_score.configure(text="--")
+                if hasattr(self, 'metric_hours_tracked'):
+                    self.metric_hours_tracked.configure(text="0.0h")
+                if hasattr(self, 'metric_breaks_taken'):
+                    self.metric_breaks_taken.configure(text="0")
+        except Exception as e:
+            print(f"Error loading stats: {e}")
     
     def open_reports_window(self):
         """Open detailed reports window"""

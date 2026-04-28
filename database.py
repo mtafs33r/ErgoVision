@@ -193,7 +193,7 @@ class DatabaseManager:
             
         try:
             db = self.get_connection()
-            if not db: return None
+            if db is None: return None
             
             result = db.user_profiles.find_one({"user_id": user_id})
             
@@ -275,7 +275,7 @@ class DatabaseManager:
             
         try:
             db = self.get_connection()
-            if not db: return default_settings
+            if db is None: return default_settings
             result = db.user_settings.find_one({"user_id": user_id})
             
             if result:
